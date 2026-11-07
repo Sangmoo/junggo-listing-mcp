@@ -2,13 +2,15 @@
 
 - API 키: 환경변수 ANTHROPIC_API_KEY (MCP 클라이언트 설정의 env로 전달)
 - 이미지/PDF(로컬 경로 또는 http(s) URL)를 Claude 입력 블록으로 변환
-- tool_choice 강제로 항상 스키마에 맞는 JSON(dict)을 받음
+- structured outputs(output_config.format)로 항상 스키마에 맞는 JSON을 받음
+  (Sonnet 5.5 / Opus 5.5는 tool_choice로 툴 호출을 강제하는 방식을 400으로 거부한다)
 """
 from __future__ import annotations
 
 import base64
 import datetime
 import io
+import json
 import os
 import urllib.request
 from pathlib import Path
@@ -121,20 +123,17 @@ def call_structured(
     client: anthropic.Anthropic,
     system: str,
     content: list[dict],
-    tool_name: str,
-    tool_description: str,
     schema: dict,
-    max_tokens: int = 4000,
+    max_tokens: int = 16000,
 ) -> dict:
-    """스키마를 가진 툴 호출을 강제해서 항상 dict를 돌려받는다."""
+    """structured outputs로 스키마에 맞는 JSON을 받아 dict로 돌려준다."""
     try:
         resp = client.messages.create(
             model=MODEL,
             max_tokens=max_tokens,
             system=system,
             messages=[{"role": "user", "content": content}],
-            tools=[{"name": tool_name, "description": tool_description, "input_schema": schema}],
-            tool_choice={"type": "tool", "name": tool_name},
+            output_config={"format": {"type": "json_schema", "schema": to_api_schema(schema)}},
         )
     except anthropic.AuthenticationError as e:
         raise ToolError("Anthropic API 키가 올바르지 않습니다.") from e
@@ -145,9 +144,34 @@ def call_structured(
     except anthropic.APIError as e:
         raise ToolError(f"Claude API 호출 중 오류가 발생했습니다: {e}") from e
 
+    if resp.stop_reason == "refusal":
+        raise ToolError("Claude가 이 요청의 처리를 거절했습니다. 다른 사진으로 시도해주세요.")
     if resp.stop_reason == "max_tokens":
         raise ToolError("응답이 길어 중간에 잘렸습니다. 파일 수를 줄여 다시 시도해주세요.")
-    for block in resp.content:
-        if block.type == "tool_use":
-            return dict(block.input)
-    raise ToolError("Claude 응답에서 결과를 찾지 못했습니다. 다시 시도해주세요.")
+    text = next((b.text for b in resp.content if b.type == "text"), None)
+    if not text:
+        raise ToolError("Claude 응답에서 결과를 찾지 못했습니다. 다시 시도해주세요.")
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        raise ToolError("Claude 응답을 해석하지 못했습니다. 다시 시도해주세요.") from e
+
+
+# structured outputs가 받지 않는 키워드
+_UNSUPPORTED = {"default", "minimum", "maximum", "multipleOf", "minLength", "maxLength", "minItems", "maxItems"}
+
+
+def to_api_schema(schema):
+    """output_config.format용 스키마: 모든 object에 additionalProperties: false, 미지원 키워드 제거.
+    (src/lib/claude.ts의 toApiSchema와 동일)"""
+    if isinstance(schema, list):
+        return [to_api_schema(s) for s in schema]
+    if not isinstance(schema, dict):
+        return schema
+    out = {k: to_api_schema(v) for k, v in schema.items() if k not in _UNSUPPORTED}
+    if schema.get("properties") is not None:
+        out["properties"] = {k: to_api_schema(v) for k, v in schema["properties"].items()}
+    t = out.get("type")
+    if t == "object" or (isinstance(t, list) and "object" in t):
+        out["additionalProperties"] = False
+    return out

@@ -5,6 +5,7 @@
 """
 import asyncio
 import io
+import json
 import os
 import sys
 from pathlib import Path
@@ -31,14 +32,14 @@ FAKE_OUTPUT = {
 
 
 class FakeMessages:
-    def __init__(self, output, stop_reason="tool_use"):
+    def __init__(self, output, stop_reason="end_turn"):
         self.output, self.stop_reason, self.calls = output, stop_reason, []
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
         return SimpleNamespace(
             stop_reason=self.stop_reason,
-            content=[SimpleNamespace(type="tool_use", input=self.output)],
+            content=[SimpleNamespace(type="text", text=json.dumps(self.output, ensure_ascii=False))],
         )
 
 
@@ -59,7 +60,11 @@ def fake(monkeypatch):
 def test_full_flow(photo, fake):
     data = server.run_listing([photo], "번개장터", "작년 구매", 120000)
     call = fake.calls[0]
-    assert call["tool_choice"] == {"type": "tool", "name": "submit_listing"}
+    assert "tool_choice" not in call and "tools" not in call  # Sonnet/Opus 5.5는 강제 tool_choice 거부
+    schema = call["output_config"]["format"]["schema"]
+    assert call["output_config"]["format"]["type"] == "json_schema"
+    assert schema["additionalProperties"] is False
+    assert "default" not in json.dumps(schema)  # structured outputs 미지원 키워드 제거
     blocks = call["messages"][0]["content"]
     assert [b["type"] for b in blocks] == ["image", "text"]
     img = Image.open(io.BytesIO(__import__("base64").b64decode(blocks[0]["source"]["data"])))

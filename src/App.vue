@@ -21,7 +21,7 @@ import {
   type Listing,
   type Platform,
 } from '@/lib/logic'
-import { LISTING_SCHEMA, SYSTEM_PROMPT, TOOL_DESCRIPTION, TOOL_NAME } from '@/lib/prompts'
+import { LISTING_SCHEMA, SYSTEM_PROMPT } from '@/lib/prompts'
 import { loadModel } from '@/lib/storage'
 import { normalize } from '@/lib/validate'
 
@@ -67,8 +67,6 @@ async function submit() {
       model: model.value,
       system: SYSTEM_PROMPT,
       content,
-      toolName: TOOL_NAME,
-      toolDescription: TOOL_DESCRIPTION,
       schema: LISTING_SCHEMA,
       signal: controller.signal,
     })

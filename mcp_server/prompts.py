@@ -8,6 +8,4 @@ from pathlib import Path
 _SHARED = json.loads((Path(__file__).resolve().parent.parent / "shared" / "prompts.json").read_text(encoding="utf-8"))
 
 SYSTEM_PROMPT: str = _SHARED["system_prompt"]
-TOOL_NAME: str = _SHARED["tool_name"]
-TOOL_DESCRIPTION: str = _SHARED["tool_description"]
 LISTING_SCHEMA: dict = _SHARED["schema"]

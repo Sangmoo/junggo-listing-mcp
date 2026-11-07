@@ -19,7 +19,7 @@ from mcp.server.mcpserver.exceptions import ToolError as MCPToolError  # noqa: E
 
 from claude_util import ToolError, call_structured, file_block, resolve_client  # noqa: E402
 from logic import MAX_IMAGES, PLATFORMS, finalize, render_checks, render_listing  # noqa: E402
-from prompts import LISTING_SCHEMA, SYSTEM_PROMPT, TOOL_DESCRIPTION, TOOL_NAME  # noqa: E402
+from prompts import LISTING_SCHEMA, SYSTEM_PROMPT  # noqa: E402
 from validate import normalize  # noqa: E402
 
 server = MCPServer(
@@ -50,8 +50,6 @@ def run_listing(images: list[str], platform: str, seller_note: str, purchase_pri
         client,
         system=SYSTEM_PROMPT,
         content=content,
-        tool_name=TOOL_NAME,
-        tool_description=TOOL_DESCRIPTION,
         schema=LISTING_SCHEMA,
     )
     return finalize(normalize(raw, LISTING_SCHEMA), platform, purchase_price)

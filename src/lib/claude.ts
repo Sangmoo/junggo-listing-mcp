@@ -1,7 +1,8 @@
 /**
  * 브라우저에서 Claude Messages API를 직접 호출한다 (두 프로젝트 공통).
  * 키는 사용자의 브라우저에만 있고 이 사이트의 서버로는 가지 않는다 (static Space라 서버가 없음).
- * tool_choice로 툴 호출을 강제해서 항상 스키마 형태의 객체를 받는다.
+ * structured outputs(output_config.format)로 항상 스키마 형태의 JSON을 받는다.
+ * (Sonnet 5.5 / Opus 5.5는 tool_choice로 툴 호출을 강제하는 방식을 400으로 거부한다)
  */
 import { ToolError } from './errors'
 import type { JsonSchema } from './validate'
@@ -23,8 +24,6 @@ export interface StructuredCall {
   model: string
   system: string
   content: ContentBlock[]
-  toolName: string
-  toolDescription: string
   schema: JsonSchema
   maxTokens?: number
   signal?: AbortSignal
@@ -53,11 +52,10 @@ export async function callStructured(opts: StructuredCall): Promise<unknown> {
       },
       body: JSON.stringify({
         model: opts.model,
-        max_tokens: opts.maxTokens ?? 4000,
+        max_tokens: opts.maxTokens ?? 16000,
         system: opts.system,
         messages: [{ role: 'user', content: opts.content }],
-        tools: [{ name: opts.toolName, description: opts.toolDescription, input_schema: opts.schema }],
-        tool_choice: { type: 'tool', name: opts.toolName },
+        output_config: { format: { type: 'json_schema', schema: toApiSchema(opts.schema) } },
       }),
     })
   } catch (e) {
@@ -84,10 +82,37 @@ export async function callStructured(opts: StructuredCall): Promise<unknown> {
     throw new ToolError(`요청이 거부되었습니다: ${msg || resp.status}`)
   }
 
+  if (body?.stop_reason === 'refusal') {
+    throw new ToolError('Claude가 이 요청의 처리를 거절했습니다. 다른 사진으로 시도해주세요.')
+  }
   if (body?.stop_reason === 'max_tokens') {
     throw new ToolError('응답이 길어 중간에 잘렸습니다. 파일 수를 줄여 다시 시도해주세요.')
   }
-  const block = (body?.content ?? []).find((b: any) => b?.type === 'tool_use')
-  if (!block) throw new ToolError('Claude 응답에서 결과를 찾지 못했습니다. 다시 시도해주세요.')
-  return block.input
+  const block = (body?.content ?? []).find((b: any) => b?.type === 'text')
+  if (!block?.text) throw new ToolError('Claude 응답에서 결과를 찾지 못했습니다. 다시 시도해주세요.')
+  try {
+    return JSON.parse(block.text)
+  } catch {
+    throw new ToolError('Claude 응답을 해석하지 못했습니다. 다시 시도해주세요.')
+  }
+}
+
+// structured outputs가 받지 않는 키워드
+const UNSUPPORTED = new Set(['default', 'minimum', 'maximum', 'multipleOf', 'minLength', 'maxLength', 'minItems', 'maxItems'])
+
+/** output_config.format용 스키마: 모든 object에 additionalProperties: false, 미지원 키워드 제거 (Python to_api_schema와 동일). */
+export function toApiSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(toApiSchema)
+  if (!schema || typeof schema !== 'object') return schema
+  const src = schema as Record<string, unknown>
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(src)) if (!UNSUPPORTED.has(k)) out[k] = toApiSchema(v)
+  if (src.properties && typeof src.properties === 'object') {
+    out.properties = Object.fromEntries(
+      Object.entries(src.properties as Record<string, unknown>).map(([k, v]) => [k, toApiSchema(v)]),
+    )
+  }
+  const t = out.type
+  if (t === 'object' || (Array.isArray(t) && t.includes('object'))) out.additionalProperties = false
+  return out
 }

@@ -37,7 +37,7 @@ Claude는 "보고 읽고 쓰는 일"만 하고, 틀리면 안 되는 부분은 �
 |---|---|
 | 제품 식별, 상태 등급, 하자·개인정보 발견, 글쓰기 | 응답 스키마 검증·정규화, 희망가 범위 계산, 해시태그 정리, 결과 조립 |
 
-Claude 응답은 `tool_choice`로 툴 호출을 강제해 항상 스키마 형태의 JSON으로 받고, 그래도 생길 수 있는 타입 어긋남(소문자 등급, 문자열로 온 배열 등)은 `validate`가 한 번 더 맞춥니다.
+Claude 응답은 structured outputs(`output_config.format`)로 항상 스키마 형태의 JSON으로 받고, 그래도 생길 수 있는 타입 어긋남(소문자 등급, 문자열로 온 배열 등)은 `validate`가 한 번 더 맞춥니다.
 
 ## 구조
 
@@ -47,7 +47,7 @@ Claude 응답은 `tool_choice`로 툴 호출을 강제해 항상 스키마 형�
 │   ├── App.vue
 │   ├── components/          # API 키 패널, 파일 선택, 복사 버튼, MCP 안내
 │   └── lib/
-│       ├── claude.ts        # 브라우저에서 Messages API 호출 (tool_choice 강제)
+│       ├── claude.ts        # 브라우저에서 Messages API 호출 (structured outputs)
 │       ├── files.ts         # 이미지 EXIF 회전·축소(긴 변 1568px)·JPEG 변환
 │       ├── validate.ts      # 스키마 기반 출력 검증·정규화
 │       └── logic.ts         # 희망가 계산·결과 조립

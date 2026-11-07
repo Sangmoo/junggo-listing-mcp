@@ -58,3 +58,14 @@ describe('render', () => {
     expect(renderListing(data)).not.toContain('희망 가격')
   })
 })
+
+describe('toApiSchema', () => {
+  it('모든 object에 additionalProperties: false, default 제거', async () => {
+    const { toApiSchema } = await import('../src/lib/claude')
+    const s = toApiSchema(LISTING_SCHEMA) as Record<string, any>
+    expect(s.additionalProperties).toBe(false)
+    expect(JSON.stringify(s)).not.toContain('"default"')
+    expect(s.properties.condition_grade.enum).toEqual(['S', 'A', 'B', 'C'])
+    expect(Object.keys(s.properties)).toEqual(Object.keys(LISTING_SCHEMA.properties!))
+  })
+})
