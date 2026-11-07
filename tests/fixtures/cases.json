@@ -1,0 +1,70 @@
+{
+  "price_range": [
+    { "price": 1000000, "grade": "S", "expected": { "low": 750000, "high": 900000, "basis": "구매가 1,000,000원 × 상태 S등급 비율 75~90%" } },
+    { "price": 50000, "grade": "B", "expected": { "low": 20000, "high": 30000 } },
+    { "price": 33333, "grade": "A", "expected": { "low": 20000, "high": 25000 } },
+    { "price": 150000, "grade": "C", "expected": { "low": 30000, "high": 60000 } },
+    { "price": 125000, "grade": "B", "expected": { "low": 50000, "high": 75000 } },
+    { "price": 200000, "grade": "A", "expected": { "low": 120000, "high": 150000 } },
+    { "price": 99999, "grade": "S", "expected": { "low": 75000, "high": 90000 } },
+    { "price": 6250, "grade": "B", "expected": { "low": 3000, "high": 4000 }, "why": "2,500원은 사사오입으로 3,000원 (은행가 반올림이면 2,000원)" },
+    { "price": 10000, "grade": "X", "expected": { "low": 4000, "high": 6000, "basis": "구매가 10,000원 × 상태 B등급 비율 40~60%" }, "why": "알 수 없는 등급은 B로" },
+    { "price": "50000", "grade": "B", "expected": { "low": 20000, "high": 30000 } },
+    { "price": 33333.7, "grade": "B", "expected": { "low": 13000, "high": 20000, "basis": "구매가 33,333원 × 상태 B등급 비율 40~60%" } },
+    { "price": 0, "grade": "A", "expected": null },
+    { "price": -5000, "grade": "A", "expected": null },
+    { "price": null, "grade": "A", "expected": null },
+    { "price": "abc", "grade": "A", "expected": null },
+    { "price": 2000000000, "grade": "A", "expected": null, "why": "10억 초과는 오타로 간주" }
+  ],
+  "hashtags": [
+    { "input": ["#아이폰", "아이폰", " 애플 워치 ", "", "#", "a", "b", "c", "d", "e"], "expected": ["아이폰", "애플워치", "a", "b", "c", "d"] },
+    { "input": ["##중고", "중고 거래"], "expected": ["중고", "중고거래"] },
+    { "input": [], "expected": [] }
+  ],
+  "normalize": [
+    {
+      "name": "정상 응답은 그대로",
+      "input": {
+        "product_name": "애플 에어팟 프로 2세대", "brand": "Apple", "model": "A2698", "category": "디지털기기",
+        "identification_confidence": "high", "condition_grade": "A", "condition_notes": ["케이스 미세 스크래치"],
+        "defects": [], "title": "에어팟 프로 2세대 팝니다", "description": "깨끗하게 썼어요.",
+        "hashtags": ["에어팟", "애플"], "questions_for_seller": ["구매 시기"], "privacy_warnings": []
+      },
+      "expected": {
+        "product_name": "애플 에어팟 프로 2세대", "brand": "Apple", "model": "A2698", "category": "디지털기기",
+        "identification_confidence": "high", "condition_grade": "A", "condition_notes": ["케이스 미세 스크래치"],
+        "defects": [], "title": "에어팟 프로 2세대 팝니다", "description": "깨끗하게 썼어요.",
+        "hashtags": ["에어팟", "애플"], "questions_for_seller": ["구매 시기"], "privacy_warnings": []
+      }
+    },
+    {
+      "name": "타입 어긋남 보정: 소문자 등급, enum 밖 신뢰도, 문자열 배열, 빈 브랜드, 누락 배열, 여분 키",
+      "input": {
+        "product_name": "  원목 의자 (추정) ", "brand": "", "category": "가구",
+        "identification_confidence": "very high", "condition_grade": "a", "condition_notes": "다리 흔들림 없음",
+        "defects": "좌판 얼룩", "title": "원목 의자", "description": "튼튼합니다.",
+        "hashtags": ["의자", 123, null, ""], "privacy_warnings": null, "price": 30000
+      },
+      "expected": {
+        "product_name": "원목 의자 (추정)", "brand": null, "model": null, "category": "가구",
+        "identification_confidence": "low", "condition_grade": "A", "condition_notes": ["다리 흔들림 없음"],
+        "defects": ["좌판 얼룩"], "title": "원목 의자", "description": "튼튼합니다.",
+        "hashtags": ["의자", "123"], "questions_for_seller": [], "privacy_warnings": []
+      }
+    },
+    {
+      "name": "필수 문자열(title) 누락은 오류",
+      "input": {
+        "product_name": "의자", "category": "가구", "identification_confidence": "low", "condition_grade": "B",
+        "condition_notes": [], "defects": [], "description": "본문", "hashtags": [], "questions_for_seller": [], "privacy_warnings": []
+      },
+      "error": true
+    },
+    {
+      "name": "응답이 객체가 아니면 오류",
+      "input": "그냥 문자열",
+      "error": true
+    }
+  ]
+}
